@@ -4,13 +4,12 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.metrics as sm
+import re
 
 from KDeterminant import KDeterminant
 
 
 def get_graph_from_gml_file(file_name, label='label'):
-    import re
-
     correct_gml = re.sub(r'\s+\[', ' [', open(file_name).read())
     return nx.parse_gml(correct_gml, label)
 
@@ -24,29 +23,32 @@ def get_communities_dict(partition_dict):
 
 def draw_communities(graph, labels, pos, algorithm_name, ax):
     communities_dict = get_communities_dict(convert_list_to_dict(labels))
+    n_communities = len(communities_dict)
 
-    for i in range(len(communities_dict)):
+    for i in range(n_communities):
 
         amplifier = i % 3
-        multi = (i / 3) * 0.3
         red = green = blue = 0
 
-        if amplifier == 0:
-            red = 0.1 + multi
-        elif amplifier == 1:
-            green = 0.1 + multi
-        else:
-            blue = 0.1 + multi
+        color = (n_communities - i) / n_communities
 
-        nx.draw_networkx_nodes(graph, pos,
+        if amplifier == 0:
+            red = color
+        elif amplifier == 1:
+            green = color
+        else:
+            blue = color
+
+        nx.draw_networkx_nodes(G=graph,
+                               pos=pos,
                                nodelist=communities_dict[i],
-                               node_color=[0.0 + red, 0.0 + green, 0.0 + blue],
-                               node_size=300,
-                               alpha=0.9,
+                               node_size=50,
+                               node_color=[red, green, blue],
+                               alpha=1,
                                ax=ax)
 
     ax.set_title(algorithm_name)
-    nx.draw_networkx_edges(graph, pos, alpha=0.5, ax=ax)
+    nx.draw_networkx_edges(G=graph, pos=pos, alpha=0.2, ax=ax)
     # labels = {i: label for i, label in enumerate(graph.nodes())}
     # nx.draw_networkx_labels(graph, pos, labels, font_size=16)
 
@@ -69,25 +71,62 @@ def convert_graph_to_edge_matrix(graph):
 
 def get_clustering_quality(ground_truth, labels):
     metrics = [sm.normalized_mutual_info_score, sm.adjusted_rand_score, sm.v_measure_score]
-    scores = [metric(ground_truth, labels) for metric in metrics]
-    return sum(scores) / len(scores)
+    return np.array([metric(ground_truth, labels) for metric in metrics]).mean()
+
+
+def plot_metrics_histogram(results, ground_truth, ax):
+    y = [get_clustering_quality(ground_truth, labels) for labels in results.values()]
+
+    ind = np.arange(len(y))
+    width = 0.35
+
+    ax.bar(ind, y, width, color='blue', error_kw=dict(elinewidth=2, ecolor='red'))
+    ax.set_xlim(-width, len(ind) + width)
+    ax.set_ylim(0, 1.5)
+    ax.set_ylabel('Average Metrics Score')
+    ax.set_title('Score Evaluation')
+
+    ax.set_xticks(ind + width / 2)
+    xtickNames = ax.set_xticklabels(results.keys())
+    plt.setp(xtickNames, fontsize=7)
+
+    for i, score in enumerate(y):
+        ax.text(i - width / 2, score, str(round(score, 2)), color='blue', fontweight='bold')
 
 
 if __name__ == "__main__":
-    n_clusters = 2
-    graph = get_graph_from_gml_file('karate.gml', 'id')
+    graph = get_graph_from_gml_file("graphs/karate.gml", "id")
     graph = nx.convert_node_labels_to_integers(graph)
     ground_truth = [0, 0, 0, 0, 0, 0, 0, 0,
                     1, 1, 0, 0, 0, 0, 1, 1,
                     0, 0, 1, 0, 1, 0, 1, 1,
                     1, 1, 1, 1, 1, 1, 1, 1,
                     1, 1]
+    n_clusters = len(set(ground_truth))
 
-    # n_clusters = 3
     # graph = nx.barbell_graph(5, 6)
     # ground_truth = [0, 0, 0, 0, 0,
     #                 1, 1, 1, 1, 1, 1,
     #                 2, 2, 2, 2, 2]
+    # n_clusters = len(set(ground_truth))
+
+    # graph = get_graph_from_gml_file("graphs/adjnoun.gml", "id")
+    # node_values = nx.get_node_attributes(graph, "value").values()
+    # indicators = list(set(node_values))
+    # ground_truth = [indicators.index(value) for value in node_values]
+    # n_clusters = len(indicators)
+
+    # graph = get_graph_from_gml_file("graphs/football.gml", "id")
+    # node_values = nx.get_node_attributes(graph, "value").values()
+    # indicators = list(set(node_values))
+    # ground_truth = [indicators.index(value) for value in node_values]
+    # n_clusters = len(indicators)
+
+    # graph = get_graph_from_gml_file("graphs/polbooks.gml", "id")
+    # node_values = nx.get_node_attributes(graph, "value").values()
+    # indicators = list(set(node_values))
+    # ground_truth = [indicators.index(value) for value in node_values]
+    # n_clusters = len(indicators)
 
     edge_matrix = convert_graph_to_edge_matrix(graph)
     # -----------------------------------------
@@ -95,28 +134,24 @@ if __name__ == "__main__":
     results = {}
 
     # Spectral Clustering
-    spectral = cluster.SpectralClustering(n_clusters=n_clusters)
-    spectral.fit(edge_matrix)
+    spectral = cluster.SpectralClustering(n_clusters=n_clusters).fit(edge_matrix)
     results["Spectral"] = list(spectral.labels_)
     # -----------------------------------------
 
     # Agglomerative Clustering
-    agglomerative = cluster.AgglomerativeClustering()
-    agglomerative.fit(edge_matrix)
+    agglomerative = cluster.AgglomerativeClustering().fit(edge_matrix)
     results["Agglomerative"] = list(agglomerative.labels_)
     # -----------------------------------------
 
     # K-means Clustering
     k = KDeterminant().get_best_k(edge_matrix)
-    kmeans = cluster.KMeans(n_clusters=k)
-    kmeans.fit(edge_matrix)
+    kmeans = cluster.KMeans(n_clusters=k).fit(edge_matrix)
     results["K-means"] = list(kmeans.labels_)
     # -----------------------------------------
 
     # Affinity Propagation Clustering
-    affinity = cluster.affinity_propagation(edge_matrix)
-    results["Affinity Propagation"] = list(affinity[1])
-    # -----------------------------------------
+    affinity = cluster.AffinityPropagation().fit(edge_matrix)
+    results["Affinity Propagation"] = list(affinity.labels_)
 
     # Plot clustering results
     pos = nx.spring_layout(graph)
@@ -125,26 +160,9 @@ if __name__ == "__main__":
                                                          )
     draw_communities(graph, ground_truth, pos, "True clusters", ax1)
 
-    for (algorithm_name, partition_list), ax in zip(results.items(), [ax3, ax4, ax5, ax6]):
-        draw_communities(graph, partition_list, pos, algorithm_name, ax)
+    for (algorithm_name, labels), ax in zip(results.items(), [ax3, ax4, ax5, ax6]):
+        draw_communities(graph, labels, pos, algorithm_name, ax)
 
-    # Metrics
-    y = [get_clustering_quality(ground_truth, labels) for labels in results.values()]
-
-    ind = np.arange(len(y))
-    width = 0.35
-
-    ax2.bar(ind, y, width, color='blue', error_kw=dict(elinewidth=2, ecolor='red'))
-    ax2.set_xlim(-width, len(ind) + width)
-    ax2.set_ylim(0, 1.5)
-    ax2.set_ylabel('Average Metrics Score')
-    ax2.set_title('Score Evaluation')
-
-    ax2.set_xticks(ind + width / 2)
-    xtickNames = ax2.set_xticklabels(results.keys())
-    plt.setp(xtickNames, fontsize=7)
-
-    for i, score in enumerate(y):
-        ax2.text(i - width / 2, score, str(round(score, 2)), color='blue', fontweight='bold')
+    plot_metrics_histogram(results, ground_truth, ax2)
 
     plt.show()
