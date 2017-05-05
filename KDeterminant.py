@@ -30,5 +30,6 @@ class KDeterminant:
         results = {}
         for k in range(1, ceil(sqrt(len(edge_matrix[0]))) + 1):
             f_k, s_k = self._f(edge_matrix, k)
+            print("at k = {}:\tf_k = {:.4f},\ts_k = {:.4f}".format(k, f_k, s_k))
             results[k] = f_k
         return min(results, key=results.get)
