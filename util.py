@@ -73,11 +73,9 @@ def convert_graph_to_edge_matrix(graph):
 def get_clustering_results(graph):
     edge_matrix = convert_graph_to_edge_matrix(graph)
     k = KDeterminant().get_best_k(edge_matrix)
-    print(k)
-
     return {
         "Affinity Propagation": list(cluster.AffinityPropagation().fit(edge_matrix).labels_),
-        "Agglomerative": list(cluster.AgglomerativeClustering(n_clusters=k).fit(edge_matrix).labels_),
+        "Agglomerative": list(cluster.AgglomerativeClustering().fit(edge_matrix).labels_),
         "K-means": list(cluster.KMeans(n_clusters=k).fit(edge_matrix).labels_),
         "Spectral": list(cluster.SpectralClustering(n_clusters=k).fit(edge_matrix).labels_)
     }
