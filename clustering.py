@@ -13,7 +13,7 @@ if __name__ == "__main__":
     min_cluster_size = 10
     for p_out in np.arange(0.2, 0.5, 0.1):
         for p_in in np.arange(0.5, 0.9, 0.1):
-            for k in range(3, 10):
+            for k in range(3, 15):
                 for max_cluster_size in range(min_cluster_size, 101, 10):
                     sizes = [random.randint(min_cluster_size, max_cluster_size) for i in range(k)]
                     graph = networkx.random_partition_graph(sizes, p_in, p_out)
